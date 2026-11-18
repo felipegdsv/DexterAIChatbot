@@ -1,4 +1,5 @@
 import argparse
+import base64
 import csv
 import datetime as dt
 import io
@@ -8,12 +9,14 @@ import shutil
 import subprocess
 import tempfile
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 
 REPOSITORY = "PokeAPI/pokeapi"
 API = f"https://api.github.com/repos/{REPOSITORY}"
 RAW = f"https://raw.githubusercontent.com/{REPOSITORY}"
+SPRITE_RAW = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon"
 BOOL_FIELDS = {
     "always_shiny",
     "forms_switchable",
@@ -53,6 +56,66 @@ def fetch(url):
     )
 
 
+def pokemon_sprite_document(pokedex_number):
+    image = fetch(f"{SPRITE_RAW}/{pokedex_number}.png")
+    return {
+        "_id": pokedex_number,
+        "contentType": "image/png",
+        "imageDataBase64": base64.b64encode(image).decode("ascii"),
+    }
+
+
+def pokemon_sprite_documents(pokedex_numbers):
+    pokedex_numbers = tuple(pokedex_numbers)
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        sprites = []
+        for index, sprite in enumerate(
+            executor.map(pokemon_sprite_document, pokedex_numbers), start=1
+        ):
+            sprites.append(sprite)
+            if index % 100 == 0 or index == len(pokedex_numbers):
+                print(
+                    f"Downloaded Pokemon sprites: {index}/{len(pokedex_numbers)}",
+                    flush=True,
+                )
+    return sprites
+
+
+def import_pokemon_images(mongosh, mongo_uri, image_documents):
+    if not image_documents:
+        raise ValueError("No Pokemon sprites were downloaded.")
+
+    with tempfile.TemporaryDirectory(prefix="pokemon-images-") as directory:
+        image_file = Path(directory) / "pokemon-images.json"
+        image_file.write_text(
+            json.dumps(image_documents, separators=(",", ":")),
+            encoding="utf-8",
+        )
+        image_file_path = json.dumps(str(image_file))
+        count = len(image_documents)
+        script = f"""
+const fs = require('fs');
+const docs = JSON.parse(fs.readFileSync({image_file_path}, 'utf8'));
+for (const doc of docs) {{
+  doc.imageData = new Binary(Buffer.from(doc.imageDataBase64, 'base64'), 0);
+  delete doc.imageDataBase64;
+}}
+const stage = db.getCollection('__staging_pokemon_images');
+stage.drop();
+stage.insertMany(docs, {{ ordered: true }});
+if (stage.countDocuments() !== {count}) {{
+  throw new Error('Pokemon image import count mismatch');
+}}
+const result = stage.renameCollection('pokemon_images', true);
+if (!result.ok) throw new Error('Could not replace pokemon_images collection');
+print('pokemon_images: ' + {count});
+"""
+        subprocess.run(
+            [mongosh, mongo_uri, "--quiet", "--eval", script],
+            check=True,
+        )
+
+
 def camel_case(value):
     head, *tail = value.split("_")
     return head + "".join(part.capitalize() for part in tail)
@@ -88,9 +151,39 @@ def main():
         or r"C:\Users\Galmir\AppData\Local\Programs\mongosh\mongosh.exe",
         help="Path to mongosh.exe.",
     )
+    parser.add_argument(
+        "--images-only",
+        action="store_true",
+        help="Import sprites for the existing Pokédex without replacing other collections.",
+    )
     args = parser.parse_args()
     if not Path(args.mongosh).is_file():
         parser.error(f"mongosh was not found: {args.mongosh}")
+
+    if args.images_only:
+        script = """
+const ids = db.pokedex.find({}, { _id: 1 })
+  .sort({ _id: 1 })
+  .toArray()
+  .map(item => item._id);
+print(JSON.stringify(ids));
+"""
+        output = subprocess.check_output(
+            [args.mongosh, args.mongo_uri, "--quiet", "--eval", script],
+            text=True,
+            encoding="utf-8",
+        )
+        pokedex_numbers = json.loads(output)
+        if not pokedex_numbers or pokedex_numbers != list(
+            range(1, len(pokedex_numbers) + 1)
+        ):
+            raise ValueError(
+                "The existing Pokédex must contain contiguous IDs starting at 1."
+            )
+
+        sprites = pokemon_sprite_documents(pokedex_numbers)
+        import_pokemon_images(args.mongosh, args.mongo_uri, sprites)
+        return
 
     cache = {}
 
@@ -758,6 +851,15 @@ def main():
         "location_areas": [({"locationId": 1}, {})],
     }
 
+    if [item["_id"] for item in species_docs] != list(
+        range(1, len(species_docs) + 1)
+    ):
+        raise ValueError("National Pokédex IDs are not complete and contiguous.")
+
+    collections["pokemon_images"] = pokemon_sprite_documents(
+        range(1, len(species_docs) + 1)
+    )
+
     with tempfile.TemporaryDirectory(prefix="pokemon-import-") as directory:
         temp = Path(directory)
         manifest_collections = []
@@ -805,11 +907,6 @@ def main():
             raise ValueError("Pokemon records do not match the source Pokemon count.")
         if learnset_rows == 0 or counts["encounters"] == 0:
             raise ValueError("Learnset or encounter source data is unexpectedly empty.")
-        if [item["_id"] for item in species_docs] != list(
-            range(1, len(species_docs) + 1)
-        ):
-            raise ValueError("National Pokédex IDs are not complete and contiguous.")
-
         metadata = [
             {
                 "_id": "pokeapi",
@@ -852,6 +949,12 @@ for (const item of collections) {{
   for (const file of item.files) {{
     const docs = JSON.parse(fs.readFileSync(file, 'utf8'));
     if (docs.length) {{
+      if (item.name === 'pokemon_images') {{
+        for (const doc of docs) {{
+          doc.imageData = new Binary(Buffer.from(doc.imageDataBase64, 'base64'), 0);
+          delete doc.imageDataBase64;
+        }}
+      }}
       stage.insertMany(docs, {{ ordered: true }});
       inserted += docs.length;
     }}

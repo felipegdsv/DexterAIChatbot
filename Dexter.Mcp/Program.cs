@@ -21,6 +21,16 @@ builder.Logging.AddConsole(options =>
 
 var app = builder.Build();
 app.MapMcp("/mcp");
+app.MapGet("/pokemon-image/{id:int}", async (
+    int id,
+    DatabaseService database,
+    CancellationToken cancellationToken) =>
+{
+    var image = await database.FindPokemonImageAsync(id, cancellationToken);
+    return image is null
+        ? Results.NotFound()
+        : Results.File(image.Value.Data, image.Value.ContentType);
+});
 app.Run();
 
 [McpServerToolType]
@@ -161,6 +171,26 @@ public sealed class DatabaseService(IConfiguration configuration)
 
         var pokemon = await FindPokemonRecordAsync(query, cancellationToken);
         return pokemon?.ToJson() ?? "[]";
+    }
+
+    public async Task<(byte[] Data, string ContentType)?> FindPokemonImageAsync(
+        int pokedexNumber,
+        CancellationToken cancellationToken)
+    {
+        if (Provider == "oracle" || pokedexNumber < 1)
+            return null;
+
+        var image = await MongoDatabase.GetCollection<BsonDocument>("pokemon_images")
+            .Find(Builders<BsonDocument>.Filter.Eq("_id", pokedexNumber))
+            .FirstOrDefaultAsync(cancellationToken);
+        if (image is null
+            || !image.TryGetValue("imageData", out var imageData)
+            || !imageData.IsBsonBinaryData)
+            return null;
+
+        return (
+            imageData.AsBsonBinaryData.Bytes,
+            image.GetValue("contentType", "image/png").AsString);
     }
 
     public async Task<string> FindPokemonLearnsetAsync(string query, CancellationToken cancellationToken)

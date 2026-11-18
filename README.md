@@ -146,9 +146,9 @@ Selecione o banco `dexter`. A importação cria esse banco se ele ainda não exi
 
 O banco `dexter` contém uma cópia das 35 coleções e índices encontrados no antigo banco local `chat_mvp`. O banco antigo foi mantido como cópia de segurança. O servidor Dexter e o importador agora usam `dexter`.
 
-O script `Dexter.Mcp/tools/import_pokemon_data.py` baixa os arquivos CSV estruturados da PokeAPI, prepara coleções e índices e grava os dados no MongoDB. Ele consulta a revisão atual de `master` da PokeAPI e registra o commit utilizado em `pokemon_dataset_metadata`.
+O script `Dexter.Mcp/tools/import_pokemon_data.py` baixa os arquivos CSV estruturados da PokeAPI, prepara coleções e índices e grava os dados no MongoDB. Ele também baixa os sprites básicos da Pokédex e os armazena como dados binários na coleção `pokemon_images`. Ele consulta a revisão atual de `master` da PokeAPI e registra o commit utilizado em `pokemon_dataset_metadata`.
 
-O importador requer conexão com a internet para acessar a API e os arquivos do GitHub. Ele usa `curl.exe` (disponível por padrão em versões atuais do Windows), Python e `mongosh`.
+O importador requer conexão com a internet para acessar a API, os arquivos CSV e os sprites do GitHub. Ele usa `curl.exe` (disponível por padrão em versões atuais do Windows), Python e `mongosh`.
 
 ### Executar a importação
 
@@ -158,7 +158,13 @@ Na raiz do projeto:
 python .\Dexter.Mcp\tools\import_pokemon_data.py
 ```
 
-Por padrão, o destino é `mongodb://localhost:27017/dexter`. O processo imprime a contagem importada de cada coleção; aguarde a conclusão antes de iniciar o Dexter.
+Por padrão, o destino é `mongodb://localhost:27017/dexter`. O processo imprime o progresso dos sprites e a contagem importada de cada coleção; aguarde a conclusão antes de iniciar o Dexter.
+
+Se a Pokédex já está carregada no Mongo, baixe e importe somente os sprites, sem substituir as outras coleções:
+
+```powershell
+python .\Dexter.Mcp\tools\import_pokemon_data.py --images-only
+```
 
 Se `mongosh` não estiver no `PATH`, passe seu caminho completo:
 
@@ -181,9 +187,11 @@ O script recebe uma URI MongoDB que inclui o nome do banco. Ajuste-a também na 
 
 A carga contém espécies, Pokémon e formas, atributos, tipos e efetividades, habilidades, itens, naturezas, movimentos, relações de aprendizado por Pokémon e versão, evoluções, encontros, locais, versões e tabelas de apoio. Também cria índices para as consultas mais usadas.
 
+Ao consultar um Pokémon pelo chat, o sprite básico armazenado em `pokemon_images` aparece na tela verde do Dexter.
+
 Na última carga validada deste projeto, os dados incluíram 1.025 espécies, 1.351 registros Pokémon, 1.579 formas, 665.810 relações de aprendizado e 117.137 encontros. As contagens podem mudar quando a PokeAPI for atualizada.
 
-São criadas 35 coleções relacionadas à importação. O importador monta coleções temporárias, verifica as contagens e então substitui as coleções de destino com os mesmos nomes. Ele não apaga o banco inteiro; coleções não relacionadas à carga, como `produtos`, são preservadas.
+São criadas 36 coleções relacionadas à importação, incluindo `pokemon_images`. O importador monta coleções temporárias, verifica as contagens e então substitui as coleções de destino com os mesmos nomes. Ele não apaga o banco inteiro; coleções não relacionadas à carga, como `produtos`, são preservadas.
 
 Os dados são estruturados e não incluem descrições narrativas ou textos de jogos. Os nomes são majoritariamente identificadores em inglês, conforme os CSVs da fonte.
 
@@ -237,6 +245,16 @@ Abra no navegador:
 <http://localhost:5226>
 
 Ordem recomendada: iniciar MongoDB, confirmar que o Ollama está ativo e que o modelo foi baixado, iniciar o MCP e, por fim, iniciar a aplicação Web.
+
+### Monitor local
+
+Para iniciar, reiniciar ou parar os processos Web e MCP pelo navegador, abra um PowerShell na raiz e execute:
+
+```powershell
+.\Monitor.ps1
+```
+
+O script abre `monitor.html` em `http://127.0.0.1:4862`. Mantenha esse PowerShell aberto enquanto usar o painel; Ctrl+C encerra somente o monitor. Os comandos controlam apenas os projetos Dexter e os logs de inicialização são gravados em `%TEMP%\DexterMonitor`. O monitor fica disponível apenas neste computador.
 
 ## Consultar e testar
 
@@ -363,5 +381,5 @@ Feche a aplicação que está ocupando a porta ou altere `applicationUrl` no `la
 ├── Dexter.Web/                     Interface web e agente Ollama
 └── Dexter.Mcp/                     Servidor MCP e acesso a dados
     └── tools/
-        └── import_pokemon_data.py  Importador da PokeAPI para MongoDB
+        └── import_pokemon_data.py  Dados e sprites da PokeAPI para MongoDB
 ```

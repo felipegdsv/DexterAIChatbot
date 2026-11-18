@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10141e">
+  <title>Monitor Dexter</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: "Segoe UI", sans-serif;
+      background: #10141e;
+      color: #eef2ff;
+      font-synthesis: none;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(ellipse at 10% 0%, #243657 0, transparent 38rem),
+        #10141e;
+    }
+
+    main { width: min(940px, calc(100% - 32px)); margin: 0 auto; padding: 64px 0; }
+    header { margin-bottom: 32px; }
+    .eyebrow { color: #91a8d1; font-size: .75rem; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+    h1 { margin: 8px 0; font-size: clamp(2rem, 5vw, 3rem); }
+    .subtitle { margin: 0; color: #aeb9ce; }
+
+    .notice, .service-card {
+      border: 1px solid #29344a;
+      border-radius: 16px;
+      background: rgb(24 31 45 / 92%);
+    }
+
+    .notice { margin: 24px 0; padding: 14px 18px; color: #bac6db; font-size: .9rem; }
+    .notice.error { border-color: #763f49; color: #ffb8be; }
+    .services { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+    .service-card { padding: 22px; }
+    .service-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+    h2 { margin: 0 0 6px; font-size: 1.2rem; }
+    .service-url { color: #9aaccb; font-size: .86rem; text-decoration: none; }
+    .service-url:hover { color: #c8d8ff; text-decoration: underline; }
+    .status { display: inline-flex; align-items: center; gap: 7px; color: #bec8d9; font-size: .82rem; white-space: nowrap; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: #818a9b; }
+    .status.running .dot { background: #51d69a; box-shadow: 0 0 12px rgb(81 214 154 / 50%); }
+    .status.stopped .dot { background: #f27b86; }
+    .detail { min-height: 24px; margin: 20px 0; color: #9ba8bd; font-size: .85rem; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    button {
+      min-height: 38px;
+      padding: 8px 12px;
+      border: 1px solid #465471;
+      border-radius: 8px;
+      background: #252f43;
+      color: #f4f6fb;
+      font: inherit;
+      font-size: .85rem;
+      cursor: pointer;
+    }
+    button:hover:not(:disabled) { background: #34425e; }
+    button.primary { border-color: #527ee8; background: #315cc2; }
+    button.primary:hover:not(:disabled) { background: #3e6ddd; }
+    button:disabled { cursor: wait; opacity: .55; }
+    footer { margin-top: 24px; color: #8794aa; font-size: .8rem; }
+    code { color: #c5d5ff; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div class="eyebrow">Painel local</div>
+      <h1>Monitor Dexter</h1>
+      <p class="subtitle">Acompanhe e controle os processos Web e MCP deste projeto.</p>
+    </header>
+
+    <div id="notice" class="notice" role="status" aria-live="polite">
+      Atualizando status dos processos...
+    </div>
+    <section id="services" class="services" aria-label="Servicos Dexter"></section>
+    <footer>
+      O status indica se o processo esta ativo. Para fechar este painel, encerre
+      <code>Monitor.ps1</code> com Ctrl+C no PowerShell que o iniciou.
+    </footer>
+  </main>
+
+  <script>
+    const servicesElement = document.querySelector("#services");
+    const noticeElement = document.querySelector("#notice");
+    const busyServices = new Set();
+    const serviceNames = { web: "Dexter.Web", mcp: "Dexter.Mcp" };
+    const serviceUrls = {
+      web: { href: "http://127.0.0.1:5226/", label: "Abrir aplicacao" },
+      mcp: { href: "http://127.0.0.1:5071/mcp", label: "Endpoint MCP" }
+    };
+
+    function showNotice(message, isError = false) {
+      noticeElement.textContent = message;
+      noticeElement.classList.toggle("error", isError);
+    }
+
+    function renderServices(services) {
+      servicesElement.replaceChildren(...services.map(service => {
+        const card = document.createElement("article");
+        card.className = "service-card";
+
+        const heading = document.createElement("div");
+        heading.className = "service-heading";
+        const titleGroup = document.createElement("div");
+        const title = document.createElement("h2");
+        title.textContent = serviceNames[service.id] || service.name;
+        const link = document.createElement("a");
+        link.className = "service-url";
+        link.href = serviceUrls[service.id].href;
+        link.textContent = serviceUrls[service.id].label;
+        link.target = "_blank";
+        link.rel = "noreferrer";
+        titleGroup.append(title, link);
+
+        const status = document.createElement("span");
+        status.className = `status ${service.status}`;
+        const dot = document.createElement("span");
+        dot.className = "dot";
+        dot.setAttribute("aria-hidden", "true");
+        const statusText = document.createElement("span");
+        statusText.textContent = service.status === "running" ? "Em execucao" : "Parado";
+        status.append(dot, statusText);
+        heading.append(titleGroup, status);
+
+        const detail = document.createElement("p");
+        detail.className = "detail";
+        detail.textContent = service.processIds.length
+          ? `PID${service.processIds.length > 1 ? "s" : ""}: ${service.processIds.join(", ")}`
+          : "Nenhum processo encontrado.";
+
+        const actions = document.createElement("div");
+        actions.className = "actions";
+        for (const [action, label, primary] of [
+          ["start", "Iniciar", true],
+          ["restart", "Reiniciar", false],
+          ["stop", "Parar", false]
+        ]) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.textContent = label;
+          if (primary) button.className = "primary";
+          button.disabled = busyServices.has(service.id);
+          button.addEventListener("click", () => controlService(service.id, action, button));
+          actions.append(button);
+        }
+        card.append(heading, detail, actions);
+        return card;
+      }));
+    }
+
+    async function refreshStatus(updateNotice = true) {
+      try {
+        const response = await fetch("/api/status", { cache: "no-store" });
+        if (!response.ok) throw new Error(`O monitor respondeu HTTP ${response.status}.`);
+        const data = await response.json();
+        renderServices(data.services);
+        if (updateNotice) showNotice("Monitor conectado. Atualizacao automatica a cada 3 segundos.");
+      } catch (error) {
+        showNotice(`${error.message} Inicie o painel com .\\Monitor.ps1 na raiz do projeto.`, true);
+      }
+    }
+
+    async function controlService(service, action, button) {
+      if (busyServices.has(service)) return;
+      busyServices.add(service);
+      button.disabled = true;
+      showNotice(`${action === "start" ? "Iniciando" : action === "stop" ? "Parando" : "Reiniciando"} ${serviceNames[service]}...`);
+      try {
+        const response = await fetch("/api/control", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ service, action })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || `O monitor respondeu HTTP ${response.status}.`);
+        await refreshStatus();
+      } catch (error) {
+        showNotice(error.message, true);
+        await refreshStatus(false);
+      } finally {
+        busyServices.delete(service);
+        await refreshStatus(false);
+      }
+    }
+
+    refreshStatus();
+    window.setInterval(refreshStatus, 3000);
+  </script>
+</body>
+</html>

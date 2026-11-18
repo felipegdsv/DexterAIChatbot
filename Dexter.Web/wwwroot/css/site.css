@@ -176,15 +176,31 @@ body > .container {
     bottom: 133px;
     left: 20px;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 54px;
-    grid-template-rows: 46px 18px;
+    grid-template-columns: 64px minmax(0, 1fr);
+    grid-template-rows: 54px 32px 18px;
     align-items: center;
-    gap: 8px 10px;
+    gap: 11px 12px;
+}
+
+.device-display {
+    position: absolute;
+    top: 46%;
+    left: 50%;
+    z-index: 1;
+    width: 160px;
+    display: grid;
+    justify-items: center;
+    gap: 8px;
+    transform: translate(-50%, -50%);
 }
 
 .mini-screen {
-    width: 68px;
-    height: 46px;
+    position: relative;
+    width: 144px;
+    height: 144px;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
     border: 3px solid #44202a;
     border-radius: 6px;
     background:
@@ -193,78 +209,158 @@ body > .container {
     box-shadow: inset 0 2px 4px rgba(17, 47, 28, .4), 0 2px 0 rgba(255, 255, 255, .18);
 }
 
+.mini-screen img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    image-rendering: pixelated;
+}
+
+.mini-screen img[hidden] {
+    display: none;
+}
+
+.pokemon-display-info {
+    width: 100%;
+    min-height: 32px;
+    text-align: center;
+}
+
+.pokemon-display-info strong {
+    color: #fff7e8;
+    font-size: 12px;
+    text-transform: capitalize;
+}
+
+.pokemon-display-info span {
+    margin-top: 3px;
+    color: #ffd5c8;
+    font-family: Consolas, monospace;
+    font-size: 9px;
+    letter-spacing: .08em;
+}
+
 .dpad {
     position: relative;
-    grid-column: 2;
-    grid-row: 1 / span 2;
-    width: 50px;
-    height: 50px;
-    border-radius: 9px;
-    background: #222b29;
-    box-shadow: inset 0 1px 2px rgba(255, 255, 255, .16), 0 2px 0 #661923;
+    grid-column: 1;
+    grid-row: 1;
+    width: 54px;
+    height: 54px;
 }
 
 .dpad::before,
 .dpad::after {
     position: absolute;
-    top: 50%;
-    left: 50%;
-    border-radius: 4px;
-    background: #222b29;
+    inset: 5px;
     content: "";
-    transform: translate(-50%, -50%);
+    clip-path: polygon(
+        38% 0, 62% 0, 66% 4%, 66% 34%, 96% 34%, 100% 38%,
+        100% 62%, 96% 66%, 66% 66%, 66% 96%, 62% 100%,
+        38% 100%, 34% 96%, 34% 66%, 4% 66%, 0 62%, 0 38%,
+        4% 34%, 34% 34%, 34% 4%
+    );
 }
 
 .dpad::before {
-    width: 62px;
-    height: 19px;
+    background: #18201e;
+    filter: drop-shadow(0 2px 0 #661923);
 }
 
 .dpad::after {
-    width: 19px;
-    height: 62px;
+    inset: 7px;
+    background: linear-gradient(145deg, #46524c, #222b29 70%);
 }
 
-.dpad i {
+.action-buttons {
+    position: relative;
+    grid-column: 2;
+    grid-row: 1;
+    width: 60px;
+    height: 50px;
+    justify-self: center;
+}
+
+.action-button {
     position: absolute;
-    z-index: 1;
-    top: 50%;
-    left: 50%;
-    width: 7px;
-    height: 7px;
-    border: 1px solid #111817;
+    width: 27px;
+    height: 27px;
+    display: grid;
+    place-items: center;
+    border: 2px solid #18201e;
     border-radius: 50%;
-    background: #4a5650;
-    transform: translate(-50%, -50%);
+    background: linear-gradient(145deg, #46524c, #222b29 70%);
+    color: #b6c0b7;
+    font-family: Consolas, monospace;
+    font-size: 8px;
+    font-weight: 900;
+    line-height: 1;
+    box-shadow: inset 0 1px 2px rgba(255, 255, 255, .16), 0 2px 0 #661923;
 }
 
-.device-small-controls {
+.device-controls .action-button {
+    display: grid;
+    margin: 0;
+    color: #b6c0b7;
+    font-family: Consolas, monospace;
+    font-size: 8px;
+    letter-spacing: 0;
+    white-space: normal;
+}
+
+.button-b {
+    bottom: 2px;
+    left: 3px;
+}
+
+.button-a {
+    top: 2px;
+    right: 3px;
+}
+
+.system-buttons {
+    grid-column: 1 / span 2;
+    grid-row: 3;
     display: flex;
-    align-items: center;
-    gap: 6px;
+    justify-content: center;
+    gap: 11px;
 }
 
-.device-small-controls > i {
-    width: 25px;
-    height: 8px;
-    border: 1px solid #5b252b;
-    border-radius: 6px;
-    background: #29312d;
-    box-shadow: inset 0 1px 1px rgba(255, 255, 255, .15);
+.system-button {
+    width: 40px;
+    height: 11px;
+    display: grid;
+    place-items: center;
+    border: 1px solid #17201d;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #414c47, #222b29);
+    color: #aeb8af;
+    font-family: Consolas, monospace;
+    font-size: 5px;
+    font-weight: 700;
+    line-height: 1;
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, .12), 0 1px 0 #661923;
+}
+
+.device-controls .system-button {
+    display: grid;
+    margin: 0;
+    color: #aeb8af;
+    font-family: Consolas, monospace;
+    font-size: 5px;
+    letter-spacing: 0;
+    white-space: normal;
 }
 
 .speaker-grille {
-    display: flex !important;
-    flex-direction: column;
-    gap: 3px;
-    margin: 0 0 0 auto !important;
-}
-
-.speaker-grille i {
-    width: 17px;
-    height: 2px;
-    border-radius: 2px;
-    background: rgba(75, 15, 22, .72);
+    grid-column: 1 / span 2;
+    grid-row: 2;
+    justify-self: center;
+    display: block !important;
+    width: 28px;
+    height: 28px;
+    margin: 0 !important;
+    background-image: radial-gradient(circle, rgba(75, 15, 22, .72) 0 1.2px, transparent 1.4px);
+    background-size: 7px 7px;
 }
 
 .device-readout {
@@ -540,12 +636,12 @@ body > .container {
     }
 
     .chat-sidebar {
-        min-height: 82px;
+        min-height: 100px;
         display: grid;
-        grid-template-columns: 58px minmax(0, 1fr);
+        grid-template-columns: 58px minmax(0, 1fr) 80px;
         grid-template-rows: 1fr;
         align-items: center;
-        padding: 8px 16px;
+        padding: 8px 12px;
         border-right: 0;
         border-bottom: 0;
     }
@@ -574,8 +670,8 @@ body > .container {
 
     .device-lights {
         position: absolute;
-        top: 10px;
-        right: 16px;
+        top: 6px;
+        right: 96px;
         gap: 6px;
         padding: 0;
     }
@@ -589,8 +685,42 @@ body > .container {
         grid-column: 2;
         grid-row: 1;
         min-width: 0;
+        max-width: 100%;
         margin-top: 0;
-        padding: 8px 72px 0 7px;
+        padding: 8px 0 0 7px;
+    }
+
+    .device-display {
+        position: static;
+        grid-column: 3;
+        grid-row: 1;
+        width: 80px;
+        gap: 2px;
+        justify-self: end;
+        transform: none;
+    }
+
+    .pokemon-display-info {
+        min-height: 22px;
+    }
+
+    .pokemon-display-info strong,
+    .pokemon-display-info span {
+        font-size: 7px;
+        white-space: normal;
+    }
+
+    .pokemon-display-info span {
+        margin-top: 1px;
+    }
+
+    .device-controls {
+        display: none;
+    }
+
+    .mini-screen {
+        width: 58px;
+        height: 56px;
     }
 
     .chat-sidebar strong {
@@ -599,10 +729,6 @@ body > .container {
 
     .chat-sidebar span {
         font-size: 8px;
-    }
-
-    .device-controls {
-        display: none;
     }
 
     .device-readout {
@@ -651,6 +777,10 @@ body > .container {
 }
 
 @media (max-width: 380px) {
+    .chat-sidebar strong {
+        font-size: 10px;
+    }
+
     .chat-header {
         align-items: flex-start;
         flex-direction: column;

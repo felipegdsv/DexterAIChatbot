@@ -16,14 +16,26 @@
             <strong>DEXTER TERMINAL</strong>
             <span>LOCAL FIELD UNIT</span>
         </div>
-        <div class="device-controls" aria-hidden="true">
-            <div class="mini-screen"></div>
-            <div class="dpad"><i></i></div>
-            <div class="device-small-controls">
-                <i></i>
-                <i></i>
-                <span class="speaker-grille"><i></i><i></i><i></i></span>
+        <div class="device-display">
+            <div class="mini-screen" role="img" aria-label="Tela da Pokédex">
+                <img id="pokemon-display-image" alt="" hidden />
             </div>
+            <div id="pokemon-display-info" class="pokemon-display-info" hidden>
+                <strong id="pokemon-display-name"></strong>
+                <span id="pokemon-display-number"></span>
+            </div>
+        </div>
+        <div class="device-controls" aria-hidden="true">
+            <div class="dpad"></div>
+            <div class="action-buttons">
+                <span class="action-button button-b">B</span>
+                <span class="action-button button-a">A</span>
+            </div>
+            <div class="system-buttons">
+                <span class="system-button">SELECT</span>
+                <span class="system-button">START</span>
+            </div>
+            <span class="speaker-grille"></span>
         </div>
         <div class="device-readout" aria-hidden="true">
             <span>OPERATION MODE</span>
@@ -61,6 +73,31 @@
 const form = document.querySelector('#chat-form');
 const input = document.querySelector('#message');
 const messages = document.querySelector('#messages');
+const pokemonDisplayImage = document.querySelector('#pokemon-display-image');
+const pokemonDisplayInfo = document.querySelector('#pokemon-display-info');
+const pokemonDisplayName = document.querySelector('#pokemon-display-name');
+const pokemonDisplayNumber = document.querySelector('#pokemon-display-number');
+
+function showPokemonDisplay(pokemon) {
+    if (!pokemon) {
+        pokemonDisplayImage.hidden = true;
+        pokemonDisplayImage.removeAttribute('src');
+        pokemonDisplayImage.alt = '';
+        pokemonDisplayInfo.hidden = true;
+        pokemonDisplayName.textContent = '';
+        pokemonDisplayNumber.textContent = '';
+        return;
+    }
+
+    pokemonDisplayImage.src = pokemon.imageUrl;
+    pokemonDisplayImage.alt = `Imagem de ${pokemon.name}`;
+    pokemonDisplayImage.hidden = false;
+    pokemonDisplayInfo.hidden = false;
+    pokemonDisplayName.textContent = pokemon.name;
+    pokemonDisplayNumber.textContent = `Nº ${String(pokemon.number).padStart(3, '0')}`;
+}
+
+pokemonDisplayImage.addEventListener('error', () => showPokemonDisplay(null));
 
 function addMessage(text, role) {
     const article = document.createElement('article');
@@ -85,6 +122,7 @@ form.addEventListener('submit', async event => {
     if (!message) return;
 
     addMessage(message, 'user');
+    showPokemonDisplay(null);
     input.value = '';
     input.disabled = true;
 
@@ -103,6 +141,11 @@ form.addEventListener('submit', async event => {
         const data = await response.json();
         typing.remove();
         addMessage(data.response, 'assistant');
+        showPokemonDisplay(data.pokemonImageUrl ? {
+            imageUrl: data.pokemonImageUrl,
+            name: data.pokemonName,
+            number: data.pokemonNumber
+        } : null);
     } catch (error) {
         typing.remove();
         addMessage(error.message || 'Não foi possível conectar ao agente.', 'assistant');

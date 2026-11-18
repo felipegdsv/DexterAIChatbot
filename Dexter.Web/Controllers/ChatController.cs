@@ -10,8 +10,5 @@ public sealed class ChatController(ChatAgentService agent) : ControllerBase
 {
     [HttpPost]
     public async Task<ChatResponse> SendAsync([FromBody] ChatRequest request, CancellationToken cancellationToken)
-        => new ChatResponse
-        {
-            Response = await agent.SendAsync(request.Message, cancellationToken)
-        };
+        => await agent.SendAsync(request.Message, cancellationToken);
 }

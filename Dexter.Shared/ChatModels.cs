@@ -8,6 +8,9 @@ public sealed class ChatRequest
 public sealed class ChatResponse
 {
     public string Response { get; set; } = string.Empty;
+    public string? PokemonImageUrl { get; set; }
+    public string? PokemonName { get; set; }
+    public int? PokemonNumber { get; set; }
 }
 
 public sealed class ChatMessage

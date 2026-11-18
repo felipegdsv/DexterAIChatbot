@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Dexter.Shared;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
 
@@ -10,11 +11,12 @@ public sealed class ChatAgentService(IConfiguration configuration, ILogger<ChatA
 {
     private readonly HttpClient _ollama = new();
 
-    public async Task<string> SendAsync(string message, CancellationToken cancellationToken)
+    public async Task<ChatResponse> SendAsync(string message, CancellationToken cancellationToken)
     {
         var ollamaBaseUrl = configuration["Ollama:BaseUrl"] ?? "http://localhost:11434";
         var model = configuration["Ollama:Model"] ?? "llama3.2";
         var mcpUrl = configuration["Mcp:BaseUrl"] ?? "http://localhost:5071/mcp";
+        PokemonDisplay? pokemonDisplay = null;
 
         await using var mcpTransport = new HttpClientTransport(new HttpClientTransportOptions
         {
@@ -82,7 +84,15 @@ public sealed class ChatAgentService(IConfiguration configuration, ILogger<ChatA
             messages.Add(JsonNode.Parse(assistant.GetRawText())!);
 
             if (toolCalls.Length == 0)
-                return content;
+            {
+                return new ChatResponse
+                {
+                    Response = content,
+                    PokemonImageUrl = pokemonDisplay?.ImageUrl,
+                    PokemonName = pokemonDisplay?.Name,
+                    PokemonNumber = pokemonDisplay?.Number
+                };
+            }
 
             foreach (var call in toolCalls)
             {
@@ -101,6 +111,12 @@ public sealed class ChatAgentService(IConfiguration configuration, ILogger<ChatA
                         .OfType<TextContentBlock>()
                         .Select(block => block.Text)
                         .FirstOrDefault() ?? "Ferramenta concluída sem conteúdo textual.";
+                    if (name == "get_pokemon")
+                    {
+                        var display = GetPokemonDisplay(text, mcpUrl);
+                        if (display is not null)
+                            pokemonDisplay = display;
+                    }
 
                     messages.Add(new JsonObject
                     {
@@ -122,6 +138,35 @@ public sealed class ChatAgentService(IConfiguration configuration, ILogger<ChatA
             }
         }
 
-        return "Não foi possível concluir a execução das ferramentas após o limite de tentativas.";
+        return new ChatResponse
+        {
+            Response = "Não foi possível concluir a execução das ferramentas após o limite de tentativas.",
+            PokemonImageUrl = pokemonDisplay?.ImageUrl,
+            PokemonName = pokemonDisplay?.Name,
+            PokemonNumber = pokemonDisplay?.Number
+        };
     }
+
+    private static PokemonDisplay? GetPokemonDisplay(string result, string mcpUrl)
+    {
+        using var document = JsonDocument.Parse(result);
+        var pokemon = document.RootElement;
+        if (pokemon.ValueKind != JsonValueKind.Object
+            || !pokemon.TryGetProperty("pokedexNumber", out var number)
+            || !number.TryGetInt32(out var pokedexNumber)
+            || !pokemon.TryGetProperty("name", out var name)
+            || name.ValueKind != JsonValueKind.String
+            || string.IsNullOrWhiteSpace(name.GetString()))
+            return null;
+
+        var imageUri = new UriBuilder(mcpUrl)
+        {
+            Path = $"/pokemon-image/{pokedexNumber}",
+            Query = string.Empty,
+            Fragment = string.Empty
+        };
+        return new PokemonDisplay(imageUri.Uri.ToString(), name.GetString()!, pokedexNumber);
+    }
+
+    private sealed record PokemonDisplay(string ImageUrl, string Name, int Number);
 }
