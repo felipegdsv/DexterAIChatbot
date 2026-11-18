@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="Dexter.Mcp/Dexter.Mcp.csproj" />
+  <Project Path="Dexter.Shared/Dexter.Shared.csproj" />
+  <Project Path="Dexter.Web/Dexter.Web.csproj" />
+</Solution>

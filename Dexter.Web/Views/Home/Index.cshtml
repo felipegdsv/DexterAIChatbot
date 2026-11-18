@@ -1,0 +1,115 @@
+﻿@{
+    ViewData["Title"] = "Dexter";
+}
+
+<div class="chat-shell">
+    <aside class="chat-sidebar">
+        <div class="device-topline">
+            <div class="brand-mark" role="img" aria-label="Lente azul DEX">DEX</div>
+            <div class="device-lights" aria-hidden="true">
+                <i class="light-red"></i>
+                <i class="light-yellow"></i>
+                <i class="light-green"></i>
+            </div>
+        </div>
+        <div class="device-label">
+            <strong>DEXTER TERMINAL</strong>
+            <span>LOCAL FIELD UNIT</span>
+        </div>
+        <div class="device-controls" aria-hidden="true">
+            <div class="mini-screen"></div>
+            <div class="dpad"><i></i></div>
+            <div class="device-small-controls">
+                <i></i>
+                <i></i>
+                <span class="speaker-grille"><i></i><i></i><i></i></span>
+            </div>
+        </div>
+        <div class="device-readout" aria-hidden="true">
+            <span>OPERATION MODE</span>
+            <strong>RESEARCH</strong>
+            <span>DATA CHANNEL</span>
+            <strong>MCP / LOCAL</strong>
+        </div>
+    </aside>
+
+    <main class="chat-main">
+        <header class="chat-header">
+            <div>
+                <p>POKÉDEX · DATABASE TERMINAL</p>
+                <h1>Central de pesquisa</h1>
+            </div>
+            <span class="status"><i></i> ONLINE</span>
+        </header>
+
+        <section id="messages" class="messages" aria-live="polite">
+            <article class="message assistant">
+                <div class="avatar">DEX</div>
+                <div class="bubble">Sistema pronto. Posso consultar a Pokédex e suas outras bases locais. O que vamos pesquisar?</div>
+            </article>
+        </section>
+
+        <form id="chat-form" class="composer">
+            <input id="message" name="message" autocomplete="off" placeholder="Digite sua consulta..." aria-label="Sua consulta" required />
+            <button type="submit" aria-label="Enviar consulta">➤</button>
+        </form>
+    </main>
+</div>
+
+@section Scripts {
+<script>
+const form = document.querySelector('#chat-form');
+const input = document.querySelector('#message');
+const messages = document.querySelector('#messages');
+
+function addMessage(text, role) {
+    const article = document.createElement('article');
+    article.className = `message ${role}`;
+
+    const avatar = document.createElement('div');
+    avatar.className = 'avatar';
+    avatar.textContent = role === 'assistant' ? 'DEX' : 'VOCÊ';
+
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.textContent = text;
+
+    article.append(avatar, bubble);
+    messages.appendChild(article);
+    messages.scrollTop = messages.scrollHeight;
+}
+
+form.addEventListener('submit', async event => {
+    event.preventDefault();
+    const message = input.value.trim();
+    if (!message) return;
+
+    addMessage(message, 'user');
+    input.value = '';
+    input.disabled = true;
+
+    const typing = document.createElement('article');
+    typing.className = 'message assistant typing';
+    typing.innerHTML = '<div class="avatar">DEX</div><div class="bubble"><span></span><span></span><span></span></div>';
+    messages.appendChild(typing);
+
+    try {
+        const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message })
+        });
+        if (!response.ok) throw new Error(await response.text());
+        const data = await response.json();
+        typing.remove();
+        addMessage(data.response, 'assistant');
+    } catch (error) {
+        typing.remove();
+        addMessage(error.message || 'Não foi possível conectar ao agente.', 'assistant');
+    } finally {
+        input.disabled = false;
+        input.focus();
+    }
+});
+</script>
+}
